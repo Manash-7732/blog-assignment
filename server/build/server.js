@@ -12,29 +12,32 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const client_1 = require("@prisma/client");
 const fastify_1 = __importDefault(require("fastify"));
-const prisma = new client_1.PrismaClient();
+const config_1 = require("./db/config");
 const app = (0, fastify_1.default)({ logger: true });
 app.post(`/signup`, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { name, email, posts } = req.body;
-    const postData = posts === null || posts === void 0 ? void 0 : posts.map((post) => {
-        return { title: post === null || post === void 0 ? void 0 : post.title, content: post === null || post === void 0 ? void 0 : post.content };
-    });
-    const result = yield prisma.user.create({
+    const { name, email } = req.body;
+    const result = yield config_1.db.user.create({
         data: {
             name,
-            email,
-            posts: {
-                create: postData,
-            },
+            email
         },
     });
     return result;
 }));
+app.post(`/login`, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { email } = req.body;
+    const result = yield config_1.db.user.findUnique({ where: { email: email } });
+    if (result) {
+        const data = {
+            message: "Login successfull!"
+        };
+        return data;
+    }
+}));
 app.post(`/post`, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { title, content, authorEmail } = req.body;
-    const result = yield prisma.post.create({
+    const result = yield config_1.db.post.create({
         data: {
             title,
             content,
@@ -46,7 +49,7 @@ app.post(`/post`, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
 app.put('/post/:id/views', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     try {
-        const post = yield prisma.post.update({
+        const post = yield config_1.db.post.update({
             where: { id: Number(id) },
             data: {
                 viewCount: {
@@ -63,13 +66,13 @@ app.put('/post/:id/views', (req, res) => __awaiter(void 0, void 0, void 0, funct
 app.put('/publish/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     try {
-        const postData = yield prisma.post.findUnique({
+        const postData = yield config_1.db.post.findUnique({
             where: { id: Number(id) },
             select: {
                 published: true,
             },
         });
-        const updatedPost = yield prisma.post.update({
+        const updatedPost = yield config_1.db.post.update({
             where: { id: Number(id) || undefined },
             data: { published: !(postData === null || postData === void 0 ? void 0 : postData.published) },
         });
@@ -81,7 +84,7 @@ app.put('/publish/:id', (req, res) => __awaiter(void 0, void 0, void 0, function
 }));
 app.delete(`/post/:id`, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
-    const post = yield prisma.post.delete({
+    const post = yield config_1.db.post.delete({
         where: {
             id: Number(id),
         },
@@ -89,12 +92,12 @@ app.delete(`/post/:id`, (req, res) => __awaiter(void 0, void 0, void 0, function
     return post;
 }));
 app.get('/users', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const users = yield prisma.user.findMany();
+    const users = yield config_1.db.user.findMany();
     return users;
 }));
 app.get('/user/:id/drafts', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
-    const drafts = yield prisma.user
+    const drafts = yield config_1.db.user
         .findUnique({
         where: { id: Number(id) },
     })
@@ -105,7 +108,7 @@ app.get('/user/:id/drafts', (req, res) => __awaiter(void 0, void 0, void 0, func
 }));
 app.get(`/post/:id`, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
-    const post = yield prisma.post.findUnique({
+    const post = yield config_1.db.post.findUnique({
         where: { id: Number(id) },
     });
     return post;
@@ -120,7 +123,7 @@ app.get('/feed', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             ],
         }
         : {};
-    const posts = yield prisma.post.findMany({
+    const posts = yield config_1.db.post.findMany({
         where: Object.assign({ published: true }, or),
         include: { author: true },
         take: Number(take) || undefined,
@@ -137,6 +140,6 @@ app.listen({ port: 5000 }, (err) => {
         process.exit(1);
     }
     console.log(`
-  🚀 Server ready at: http://localhost:3000
+  🚀 Server ready at: http://localhost:5000
   ⭐️ See sample requests: http://pris.ly/e/ts/rest-fastify#3-using-the-rest-api`);
 });

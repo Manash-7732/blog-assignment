@@ -1,42 +1,48 @@
 import { Prisma, PrismaClient } from '@prisma/client'
 import fastify from 'fastify'
+import { db } from "./db/config"
 
-const prisma = new PrismaClient()
 const app = fastify({ logger: true })
 
 app.post<{
   Body: ISignupBody
 }>(`/signup`, async (req, res) => {
-  const { name, email, posts } = req.body
-
-  const postData = posts?.map((post: Prisma.PostCreateInput) => {
-    return { title: post?.title, content: post?.content }
-  })
-
-  const result = await prisma.user.create({
+  const { name, email} = req.body
+  const result = await db.user.create({
     data: {
       name,
-      email,
-      posts: {
-        create: postData,
-      },
+      email
     },
   })
   return result
+})
+
+app.post<{Body: {email: string}}>(`/login`, async (req, res) => {
+  const { email } = req.body;
+  const result = await db.user.findUnique({where: {email:email}})
+
+  if(result) {
+    const data = {
+      message: "Login successfull!"
+    }
+    return data
+  }
 })
 
 app.post<{
   Body: ICreatePostBody
 }>(`/post`, async (req, res) => {
   const { title, content, authorEmail } = req.body
-  const result = await prisma.post.create({
+  const result = await db.post.create({
     data: {
       title,
       content,
       author: { connect: { email: authorEmail } },
     },
   })
+
   return result
+
 })
 
 app.put<{
@@ -45,7 +51,7 @@ app.put<{
   const { id } = req.params
 
   try {
-    const post = await prisma.post.update({
+    const post = await db.post.update({
       where: { id: Number(id) },
       data: {
         viewCount: {
@@ -66,14 +72,14 @@ app.put<{
   const { id } = req.params
 
   try {
-    const postData = await prisma.post.findUnique({
+    const postData = await db.post.findUnique({
       where: { id: Number(id) },
       select: {
         published: true,
       },
     })
 
-    const updatedPost = await prisma.post.update({
+    const updatedPost = await db.post.update({
       where: { id: Number(id) || undefined },
       data: { published: !postData?.published },
     })
@@ -87,7 +93,7 @@ app.delete<{
   Params: IPostByIdParam
 }>(`/post/:id`, async (req, res) => {
   const { id } = req.params
-  const post = await prisma.post.delete({
+  const post = await db.post.delete({
     where: {
       id: Number(id),
     },
@@ -96,7 +102,7 @@ app.delete<{
 })
 
 app.get('/users', async (req, res) => {
-  const users = await prisma.user.findMany()
+  const users = await db.user.findMany()
   return users
 })
 
@@ -105,7 +111,7 @@ app.get<{
 }>('/user/:id/drafts', async (req, res) => {
   const { id } = req.params
 
-  const drafts = await prisma.user
+  const drafts = await db.user
     .findUnique({
       where: { id: Number(id) },
     })
@@ -121,7 +127,7 @@ app.get<{
 }>(`/post/:id`, async (req, res) => {
   const { id } = req.params
 
-  const post = await prisma.post.findUnique({
+  const post = await db.post.findUnique({
     where: { id: Number(id) },
   })
   return post
@@ -141,7 +147,7 @@ app.get<{
     }
     : {}
 
-  const posts = await prisma.post.findMany({
+  const posts = await db.post.findMany({
     where: {
       published: true,
       ...or,
